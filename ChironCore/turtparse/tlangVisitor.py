@@ -124,11 +124,6 @@ class tlangVisitor(ParseTreeVisitor):
         return self.visitChildren(ctx)
 
 
-    # Visit a parse tree produced by tlangParser#procedure.
-    def visitProcedure(self, ctx:tlangParser.ProcedureContext):
-        return self.visitChildren(ctx)
-
-
     # Visit a parse tree produced by tlangParser#procedureDeclaration.
     def visitProcedureDeclaration(self, ctx:tlangParser.ProcedureDeclarationContext):
         return self.visitChildren(ctx)
@@ -139,8 +134,8 @@ class tlangVisitor(ParseTreeVisitor):
         return self.visitChildren(ctx)
 
 
-    # Visit a parse tree produced by tlangParser#ret.
-    def visitRet(self, ctx:tlangParser.RetContext):
+    # Visit a parse tree produced by tlangParser#returnStatement.
+    def visitReturnStatement(self, ctx:tlangParser.ReturnStatementContext):
         return self.visitChildren(ctx)
 
 
