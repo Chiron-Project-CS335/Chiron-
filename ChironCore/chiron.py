@@ -25,6 +25,86 @@ import submissionDFA as DFASub
 import submissionAI as AISub
 from sbflSubmission import computeRanks
 import csv
+import pprint
+
+
+def print_parse_tree(tree, title="Parse Tree"):
+    """
+    Print a visual representation of the ANTLR parse tree
+    """
+    print(f"\n{'=' * 40}")
+    print(f"{title}:")
+    print(f"{'=' * 40}")
+
+    # Print tree structure using ANTLR's built-in tree visualization
+    from antlr4.tree.Trees import Trees
+    print(Trees.toStringTree(tree, None, tree.parser))
+    print(f"{'=' * 40}\n")
+
+
+def print_ast_node(node, indent=0, prefix=""):
+    """
+    Recursively print an AST node and its children
+    """
+    if node is None:
+        return
+
+    # Print the current node
+    node_type = node.__class__.__name__
+    node_str = str(node)
+    print(f"{' ' * indent}{prefix}{node_type}: {node_str}")
+
+    # Recursively print children based on node type
+    if hasattr(node, 'lexpr') and node.lexpr:
+        print_ast_node(node.lexpr, indent + 4, "left: ")
+    if hasattr(node, 'rexpr') and node.rexpr:
+        print_ast_node(node.rexpr, indent + 4, "right: ")
+    if hasattr(node, 'expr') and node.expr:
+        print_ast_node(node.expr, indent + 4, "expr: ")
+    if hasattr(node, 'cond') and node.cond:
+        print_ast_node(node.cond, indent + 4, "cond: ")
+
+    # Handle list-like AST nodes (for statements, etc.)
+    for attr in ['lvar', 'body', 'orelse', 'elts']:
+        if hasattr(node, attr) and getattr(node, attr):
+            attr_value = getattr(node, attr)
+            if isinstance(attr_value, list):
+                for i, item in enumerate(attr_value):
+                    print_ast_node(item, indent + 4, f"{attr}[{i}]: ")
+            else:
+                print_ast_node(attr_value, indent + 4, f"{attr}: ")
+
+
+def print_ast(ast_nodes, title="Abstract Syntax Tree"):
+    """
+    Print AST nodes with structure
+    """
+    print(f"\n{'=' * 40}")
+    print(f"{title}:")
+    print(f"{'=' * 40}")
+
+    if isinstance(ast_nodes, list):
+        for i, (node, jump) in enumerate(ast_nodes):
+            print(f"\n--- Instruction {i} (jump: {jump}) ---")
+            print_ast_node(node)
+    else:
+        print_ast_node(ast_nodes)
+
+    print(f"{'=' * 40}\n")
+
+
+def print_ir(ir, title="Intermediate Representation"):
+    """
+    Print the IR in a readable format
+    """
+    print(f"\n{'=' * 40}")
+    print(f"{title}:")
+    print(f"{'=' * 40}")
+
+    for idx, (instr, jump) in enumerate(ir):
+        print(f"[L{idx}]".rjust(5), instr, f"[jump: {jump}]")
+
+    print(f"{'=' * 40}\n")
 
 
 def cleanup():
@@ -47,7 +127,7 @@ if __name__ == "__main__":
     ░╚════╝░╚═╝░░╚═╝╚═╝╚═╝░░╚═╝░╚════╝░╚═╝░░╚══╝
     """
     )
-
+    print("Starting Chiron execution")
     # process the command-line arguments
     cmdparser = argparse.ArgumentParser(
         description="Program Analysis Framework for ChironLang Programs."
@@ -197,6 +277,7 @@ if __name__ == "__main__":
     )
 
     args = cmdparser.parse_args()
+    print(f"Arguments parsed: {args}")
     ir = ""
 
     if not (type(args.params) is dict):
@@ -210,13 +291,19 @@ if __name__ == "__main__":
     if args.bin:
         ir = irHandler.loadIR(args.progfl)
     else:
+        print(f"Attempting to parse file: {args.progfl}")
         parseTree = getParseTree(args.progfl)
+        print("Parse tree generated successfully")
+        print_parse_tree(parseTree)
+        print("Parse tree generated successfully")
+        print("Starting AST generation")
         astgen = astGenPass()
         ir = astgen.visitStart(parseTree)
-
+        print_ast(ir, "AST after generation")
     # Set the IR of the program.
     irHandler.setIR(ir)
-
+    print(f"IR generated with {len(ir)} instructions")
+    print_ir(irHandler.ir)
     # generate control_flow_graph from IR statements.
     if args.control_flow:
         cfg = cfgB.buildCFG(ir, "control_flow_graph", True)

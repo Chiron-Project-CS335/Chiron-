@@ -8,6 +8,34 @@ Release="Chiron v5.3"
 def addContext(s):
     return str(s).strip().replace(":", "self.prg.")
 
+
+class ActivationRecord:
+    """Represents a function call's execution context"""
+
+    def __init__(self, proc_name, return_address, params=None):
+        self.proc_name = proc_name  # Procedure name
+        self.return_address = return_address  # Return PC address
+        self.local_vars = {}  # Local variables dictionary
+        self.return_value = None  # Return value storage
+
+        # Initialize with parameters if provided
+        if params:
+            for name, value in params.items():
+                self.local_vars[name] = value
+
+    def get_var(self, name):
+        """Get a local variable value"""
+        return self.local_vars.get(name)
+
+    def set_var(self, name, value):
+        """Set a local variable value"""
+        self.local_vars[name] = value
+
+    def __repr__(self):
+        """String representation for debugging"""
+        return f"ActivationRecord({self.proc_name}, ret={self.return_address}, vars={self.local_vars})"
+
+
 class Interpreter:
     # Turtle program should not contain variable with names "ir", "pc", "t_screen"
     ir = None
@@ -94,6 +122,7 @@ class ConcreteInterpreter(Interpreter):
             self.chironhook = Chironhooks.ConcreteChironHooks()
         self.pc = 0
 
+        self.procedureTable = {}
     def interpret(self):
         #print("Program counter : ", self.pc)
         stmt, tgt = self.ir[self.pc] #############
@@ -113,8 +142,8 @@ class ConcreteInterpreter(Interpreter):
             ntgt = self.handleGotoCommand(stmt, tgt)
         elif isinstance(stmt, ChironAST.NoOpCommand):
             ntgt = self.handleNoOpCommand(stmt, tgt)
-        elif isinstance(stmt, ChironAST.Function):
-            ntgt = self.handleFunction(stmt, tgt)
+        elif isinstance(stmt, ChironAST.FunctionCall):
+            ntgt = self.handleFunctionCall(stmt, tgt)
 
 
         elif isinstance(stmt, ChironAST.Procedure):
@@ -181,13 +210,72 @@ class ConcreteInterpreter(Interpreter):
         ycor = addContext(stmt.ycor)
         exec("self.trtl.goto(%s, %s)" % (xcor, ycor))
         return 1
-    
-    def handleFunction(self, stmt, tgt):
-        print(" Function")
-        arg0 = addContext(stmt.arg0)
-        arg1 = addContext(stmt.arg1)
-        
-        return 1
+
+    def get_variable(self, name):
+        """Get variable value respecting scope chain"""
+        # Remove ':' prefix if present
+        if name.startswith(':'):
+            name = name[1:]
+
+        # First check local scope (current activation record)
+        if self.call_stack:
+            current_ar = self.call_stack[-1]
+            local_value = current_ar.get_var(name)
+            if local_value is not None:
+                return local_value
+
+        # Fall back to global scope
+        return getattr(self.prg, name, None)
+
+    def set_variable(self, name, value):
+        """Set variable value respecting scope chain"""
+        # Remove ':' prefix if present
+        if name.startswith(':'):
+            name = name[1:]
+
+        # If inside a function, set in local scope
+        if self.call_stack:
+            current_ar = self.call_stack[-1]
+            current_ar.set_var(name, value)
+        else:
+            # Set in global scope
+            setattr(self.prg, name, value)
+
+    def handleFunctionCall(self, stmt, tgt):
+        print(" Function Call Expression")
+        # This is similar to handleProcedureCall but returns a value
+        func_name = stmt.name
+
+        # Evaluate arguments
+        args = []
+        for arg in stmt.args:
+            args.append(self.evaluate_expression(arg))
+
+        # Get procedure info
+        if func_name not in self.procedureTable:
+            raise ValueError(f"Function {func_name} not defined")
+
+        proc_info = self.procedureTable[func_name]
+        start_pc = proc_info[0]
+        param_names = proc_info[2] if len(proc_info) > 2 else []
+
+        # Match arguments to parameters
+        params = {}
+        for i, param_name in enumerate(param_names):
+            if i < len(args):
+                clean_name = param_name[1:] if param_name.startswith(':') else param_name
+                params[clean_name] = args[i]
+
+        # Create and push activation record
+        return_addr = self.pc + 1
+        activation_record = ActivationRecord(func_name, return_addr, params)
+        self.call_stack.append(activation_record)
+
+        # Execute the function
+        self.procedureTable[func_name][1] = return_addr
+
+        # Calculate jump target
+        return start_pc - self.pc
 
     def handleProcedureDec(self, stmt, tgt):
         #print(" Procedure Declaration")
@@ -202,7 +290,54 @@ class ConcreteInterpreter(Interpreter):
 
         #print(stmt, ' ', self.procedureTable[stmt][0])
         return tgt
-    
+
+    def evaluate_expression(self, expr):
+        """Evaluate an expression with proper variable scoping"""
+        # If the expression is a FunctionCall object, evaluate it
+        if isinstance(expr, ChironAST.FunctionCall):
+            func_name = expr.name
+
+            # Evaluate arguments
+            args = []
+            for arg in expr.args:
+                args.append(self.evaluate_expression(arg))
+
+            # Create parameter map
+            params = {}
+            if func_name in self.procedureTable:
+                param_names = self.procedureTable[func_name][2]
+                for i, param_name in enumerate(param_names):
+                    if i < len(args):
+                        clean_name = param_name[1:] if param_name.startswith(':') else param_name
+                        params[clean_name] = args[i]
+
+            # Save current PC
+            current_pc = self.pc
+            return_addr = current_pc + 1
+
+            # Create and push activation record
+            activation_record = ActivationRecord(func_name, return_addr, params)
+            self.call_stack.append(activation_record)
+
+            # Jump to function start
+            start_pc = self.procedureTable[func_name][0]
+            self.pc = start_pc - 1  # Will be incremented in next interpret() call
+
+            # Execute function until it returns
+            while self.call_stack and self.call_stack[-1].proc_name == func_name:
+                if self.interpret():  # Program ended
+                    break
+
+            # Restore PC
+            self.pc = current_pc
+
+            # Return the function's result
+            return_value = self.get_variable("_return_value")
+            return return_value
+
+        # The rest of your existing evaluate_expression code for handling strings, etc.
+        # ...
+
     def handleProcedureCall(self, stmt):
         #print(" Procedure Call")
 

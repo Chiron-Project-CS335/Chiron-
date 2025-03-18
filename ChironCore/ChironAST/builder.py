@@ -19,14 +19,27 @@ class astGenPass(tlangVisitor):
         
         
     def visitStart(self, ctx:tlangParser.StartContext):
+        print("visitStart called")
         stmtList = self.visit(ctx.instruction_list())
+        print(f"visitStart returning statement list with {len(stmtList)} statements")
         return stmtList
 
-    def visitInstruction_list(self, ctx:tlangParser.Instruction_listContext):
+    def visitInstruction_list(self, ctx: tlangParser.Instruction_listContext):
+        print("visitInstruction_list called")
         instrList = []
-        for instr in ctx.instruction():
-            instrList.extend(self.visit(instr))
-
+        for i, instr in enumerate(ctx.instruction()):
+            ctx_type = type(instr.getChild(0)).__name__ if instr.getChildCount() > 0 else "Unknown"
+            print(f"Visiting instruction {i}, type: {instr.__class__.__name__}, text: {instr.getText()}, specific type: {ctx_type}")
+            try:
+                result = self.visit(instr)
+                if result is None:
+                    print(f"Warning: visit returned None for instruction {i}, specific type: {ctx_type}")
+                else:
+                    instrList.extend(result)
+                    print(f"Added instruction, list now has {len(instrList)} items")
+            except Exception as e:
+                print(f"Error visiting instruction {i}: {e}")
+                raise
         return instrList
 
     def visitStrict_ilist(self, ctx:tlangParser.Strict_ilistContext):
@@ -37,13 +50,71 @@ class astGenPass(tlangVisitor):
             instrList.extend(visvalue)
 
         return instrList
-     
-    def visitFunction(self, ctx:tlangParser.FunctionContext):
-    
-        arg0 = self.visit(ctx.VAR(0))
-        arg1 = self.visit(ctx.VAR(1))
 
-        return [(ChironAST.Function(arg0, arg1), 1)]
+    def visitFunctionCall(self, ctx: tlangParser.FunctionCallContext):
+        print(f"Visiting function call: {ctx.getText()}")
+        name = str(ctx.NAME())
+        args = []
+        if ctx.argList():
+            for expr in ctx.argList().expression():
+                args.append(self.visit(expr))
+        # Create function call node
+        # Return appropriate AST node
+        return [(ChironAST.ProcedureCall(name), 1)]
+
+    def visitProcedureDeclaration(self, ctx: tlangParser.ProcedureDeclarationContext):
+        print(f"Visiting procedure declaration: {ctx.NAME().getText()}")
+
+        # Extract procedure name
+        proc_name = ctx.NAME().getText()
+
+        # Extract parameters if any
+        params = []
+        if ctx.paramList():
+            for var in ctx.paramList().VAR():
+                params.append(var.getText())
+
+        print(f"  Procedure name: {proc_name}, params: {params}")
+
+        # Create procedure node
+        proc = ChironAST.Procedure(proc_name, params)
+
+        # Visit body instructions
+        print(f"  Visiting procedure body instructions")
+        bodyInstrList = self.visit(ctx.strict_ilist())
+        print(f" Body instructions count: {len(bodyInstrList)}")
+
+        # Return instruction list with procedure declaration at start
+        return [(proc, len(bodyInstrList) + 1)] + bodyInstrList
+
+    def visitProcedureCall(self, ctx: tlangParser.ProcedureCallContext):
+        """Visit a standalone procedure call"""
+        # Extract procedure name
+        proc_name = ctx.NAME().getText()
+
+        # Create AST node for procedure call
+        proc_call = ChironAST.ProcedureCall(proc_name)
+
+        # If there are arguments, process them
+        if ctx.argList():
+            args = []
+            for expr in ctx.argList().expression():
+                args.append(self.visit(expr))
+            proc_call.args = args
+
+        return [(proc_call, 1)]  # Return as IR instruction with jump target 1
+
+    def visitReturnStatement(self, ctx: tlangParser.ReturnStatementContext):
+        print(f"Visiting return statement: {ctx.getText()}")
+        expr = self.visit(ctx.expression())
+        print(f"  Return expression: {expr}")
+        return [(ChironAST.ProcedureRet(expr), 1)]
+    # def visitFunction(self, ctx:tlangParser.FunctionContext):
+    #
+    #     arg0 = self.visit(ctx.VAR(0))
+    #     arg1 = self.visit(ctx.VAR(1))
+    #
+    #     return [(ChironAST.Function(arg0, arg1), 1)]
         
         #if ctx.additive().PLUS():
             # return [(ChironAST.Function('+', arg0, arg1), 1)]
@@ -103,27 +174,27 @@ class astGenPass(tlangVisitor):
             return ChironAST.Div(left, right)
 
 
-    # Visit a parse tree produced by tlangParser#parenExpr.
-    def visitParenExpr(self, ctx:tlangParser.ParenExprContext):
-        return self.visit(ctx.expression()) 
-    
-    def visitProcedureDeclaration(self, ctx:tlangParser.ProcedureDeclarationContext):
-        proc_name = ChironAST.Procedure(ctx.NAME())
-        InstrList = self.visit(ctx.strict_ilist())
-        return [(proc_name, len(InstrList) + 1)] + InstrList  
-    
-    def visitProcedureCall(self, ctx:tlangParser.ProcedureCallContext):
-        proc_name = ChironAST.ProcedureCall(ctx.NAME())
-    
-        return [(proc_name, 1)] #actually tgt = 1 is not requied, 
-                                #tgt will be found by handler from procedure table  
-    
-    def visitRet(self, ctx:tlangParser.RetContext): #RetContext not needed
-        ret_name = ChironAST.ProcedureRet(ctx.NAME())
-    
-        return [(ret_name, 1)] #actually tgt = 1 is not requied, 
-                                #tgt will be found by handler from procedure table 
-   
+    # # Visit a parse tree produced by tlangParser#parenExpr.
+    # def visitParenExpr(self, ctx:tlangParser.ParenExprContext):
+    #     return self.visit(ctx.expression())
+    #
+    # def visitProcedureDeclaration(self, ctx:tlangParser.ProcedureDeclarationContext):
+    #     proc_name = ChironAST.Procedure(ctx.NAME())
+    #     InstrList = self.visit(ctx.strict_ilist())
+    #     return [(proc_name, len(InstrList) + 1)] + InstrList
+    #
+    # def visitProcedureCall(self, ctx:tlangParser.ProcedureCallContext):
+    #     proc_name = ChironAST.ProcedureCall(ctx.NAME())
+    #
+    #     return [(proc_name, 1)] #actually tgt = 1 is not requied,
+    #                             #tgt will be found by handler from procedure table
+    #
+    # def visitRet(self, ctx:tlangParser.RetContext): #RetContext not needed
+    #     ret_name = ChironAST.ProcedureRet(ctx.NAME())
+    #
+    #     return [(ret_name, 1)] #actually tgt = 1 is not requied,
+    #                             #tgt will be found by handler from procedure table
+    #
     def visitCondition(self, ctx:tlangParser.ConditionContext):
         if ctx.PENCOND():
             return ChironAST.PenStatus()
@@ -201,3 +272,21 @@ class astGenPass(tlangVisitor):
 
     def visitPenCommand(self, ctx:tlangParser.PenCommandContext):
         return [(ChironAST.PenCommand(ctx.getText()), 1)]
+
+    def visitFunctionCallExpr(self, ctx: tlangParser.FunctionCallExprContext):
+        print("Visiting function call expression")
+        func_call = ctx.functionCall()
+        name = func_call.NAME().getText()
+
+        # Create function call object
+        func = ChironAST.FunctionCall(name)
+
+        # Process arguments
+        if func_call.argList():
+            for expr in func_call.argList().expression():
+                func.args.append(self.visit(expr))
+
+        return func  # Return a FunctionCall object, not a list
+
+    def visitPauseCommand(self, ctx:tlangParser.PauseCommandContext):
+        return [(ChironAST.PauseCommand(), 1)]

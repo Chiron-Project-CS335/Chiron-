@@ -11,35 +11,37 @@ class AST(object):
 class Instruction(AST):
     pass
 
-class Function(Instruction):
-    def __init__(self, x, y):
-        #self.opsymbol = opsymbol
-        self.arg0 = x
-        self.arg1 = y
 
-    def __str__(self):
-        return self.arg0.__str__() + '+' + self.arg1.__str__()
-    
-class Procedure(Instruction):
-    def __init__(self, name):
-        self.name = name
-
-    def __str__(self):
-        return 'procedure ' + str(self.name)
-    
 class ProcedureCall(Instruction):
     def __init__(self, name):
         self.name = name
+        self.args = []
 
     def __str__(self):
-        return 'procedure call ' + str(self.name)
+        arg_str = ", ".join(str(arg) for arg in self.args) if self.args else ""
+        return f"procedure call {self.name}({arg_str})"
+
+
+class Procedure(Instruction):
+    def __init__(self, name, params=None):
+        self.name = name
+        self.params = params if params else []
+
+    def __str__(self):
+        params_str = ", ".join(str(param) for param in self.params) if self.params else ""
+        return f"procedure {self.name}({params_str})"
+
 
 class ProcedureRet(Instruction):
-    def __init__(self, name):
-        self.name = name
+    def __init__(self, expr=None):
+        self.expr = expr
 
     def __str__(self):
-        return 'returning from ' + str(self.name)
+        if self.expr:
+            return f"returning with {self.expr}"
+        else:
+            return "returning"
+
 
 class AssignmentCommand(Instruction):
     def __init__(self, leftvar, rexpr):
@@ -262,3 +264,13 @@ class Var(Value):
 
     def __str__(self):
         return self.varname
+#---function expression
+
+class FunctionCall(Expression):
+    def __init__(self, name):
+        self.name = name
+        self.args = []
+
+    def __str__(self):
+        arg_str = ", ".join(str(arg) for arg in self.args) if self.args else ""
+        return f"{self.name}({arg_str})"
