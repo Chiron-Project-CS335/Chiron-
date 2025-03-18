@@ -13,9 +13,8 @@ strict_ilist : (instruction)+
 instruction : assignment
 	    | conditional
 	    | loop
-		| function
 		| procedureDeclaration
-		| procedureCall
+		| procedureCall      // standalone call, no return value expected, I will check at interpreter level whether it is correct or not. Even if provided I will ignore it
 		| returnStatement
 	    | moveCommand
 	    | penCommand
@@ -30,8 +29,6 @@ ifConditional : 'if' condition '[' strict_ilist ']' ;
 ifElseConditional : 'if' condition '[' strict_ilist ']' 'else' '[' strict_ilist ']' ;
 
 loop : 'repeat' value '[' strict_ilist ']' ;
-
-function : 'function' '(' VAR ',' VAR ')' ;
 
 gotoCommand : 'goto' '(' expression ',' expression ')';
 
@@ -48,6 +45,7 @@ pauseCommand : 'pause' ;
 expression : unaryArithOp expression               #unaryExpr
            | expression multiplicative expression  #mulExpr
 		   | expression additive expression        #addExpr
+		   | functionCall                          #functionCallExpr  // explicitly returns value
 		   | value                                 #valueExpr
 		   | '(' expression ')'                    #parenExpr
  	   ;
@@ -66,8 +64,12 @@ DIV      : '/' ;
 // TODO :
 // procedure_declaration : 'to' NAME (VAR)+ strict_ilist 'end' ;
 
-procedureDeclaration : 'to' NAME (VAR)* '[' strict_ilist ']' 'end';
-procedureCall : NAME (expression)*;
+procedureDeclaration : 'to' NAME '(' paramList? ')' '[' strict_ilist ']' 'end';
+paramList : VAR (',' VAR)* ;
+procedureCall : NAME '(' argList? ')' ;         // standalone instruction, no return expected
+functionCall : NAME '(' argList? ')' ;          // used inside expressions, must return a value
+argList : expression (',' expression)* ;
+
 returnStatement : 'output' expression;
 
 

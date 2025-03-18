@@ -49,11 +49,6 @@ class tlangVisitor(ParseTreeVisitor):
         return self.visitChildren(ctx)
 
 
-    # Visit a parse tree produced by tlangParser#function.
-    def visitFunction(self, ctx:tlangParser.FunctionContext):
-        return self.visitChildren(ctx)
-
-
     # Visit a parse tree produced by tlangParser#gotoCommand.
     def visitGotoCommand(self, ctx:tlangParser.GotoCommandContext):
         return self.visitChildren(ctx)
@@ -99,6 +94,11 @@ class tlangVisitor(ParseTreeVisitor):
         return self.visitChildren(ctx)
 
 
+    # Visit a parse tree produced by tlangParser#functionCallExpr.
+    def visitFunctionCallExpr(self, ctx:tlangParser.FunctionCallExprContext):
+        return self.visitChildren(ctx)
+
+
     # Visit a parse tree produced by tlangParser#mulExpr.
     def visitMulExpr(self, ctx:tlangParser.MulExprContext):
         return self.visitChildren(ctx)
@@ -129,8 +129,23 @@ class tlangVisitor(ParseTreeVisitor):
         return self.visitChildren(ctx)
 
 
+    # Visit a parse tree produced by tlangParser#paramList.
+    def visitParamList(self, ctx:tlangParser.ParamListContext):
+        return self.visitChildren(ctx)
+
+
     # Visit a parse tree produced by tlangParser#procedureCall.
     def visitProcedureCall(self, ctx:tlangParser.ProcedureCallContext):
+        return self.visitChildren(ctx)
+
+
+    # Visit a parse tree produced by tlangParser#functionCall.
+    def visitFunctionCall(self, ctx:tlangParser.FunctionCallContext):
+        return self.visitChildren(ctx)
+
+
+    # Visit a parse tree produced by tlangParser#argList.
+    def visitArgList(self, ctx:tlangParser.ArgListContext):
         return self.visitChildren(ctx)
 
 

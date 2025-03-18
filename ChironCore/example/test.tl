@@ -4,6 +4,7 @@ to square :size [
     right 90
   ]
   output :size * 4
+  ]
 end
 
 to rectangle :length :width [
@@ -15,6 +16,7 @@ to rectangle :length :width [
   right 90
   forward :width
   output 2 * (:length + :width)
+  ]
 end
 
 :result = square 50
