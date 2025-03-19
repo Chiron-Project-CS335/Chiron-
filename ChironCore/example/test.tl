@@ -1,4 +1,4 @@
-to square :size [
+to square (:size) [
   repeat 4 [
     forward :size
     right 90
@@ -7,7 +7,7 @@ to square :size [
   ]
 end
 
-to rectangle :length :width [
+to rectangle (:length, :width) [
   forward :length
   right 90
   forward :width
@@ -19,5 +19,5 @@ to rectangle :length :width [
   ]
 end
 
-:result = square 50
-:perimeter = rectangle 100 50
+:result = square (50)
+:perimeter = rectangle (100 ,50)
