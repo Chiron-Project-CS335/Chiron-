@@ -175,8 +175,8 @@ class astGenPass(tlangVisitor):
 
 
     # # Visit a parse tree produced by tlangParser#parenExpr.
-    # def visitParenExpr(self, ctx:tlangParser.ParenExprContext):
-    #     return self.visit(ctx.expression())
+    def visitParenExpr(self, ctx:tlangParser.ParenExprContext):
+        return self.visit(ctx.expression())
     #
     # def visitProcedureDeclaration(self, ctx:tlangParser.ProcedureDeclarationContext):
     #     proc_name = ChironAST.Procedure(ctx.NAME())

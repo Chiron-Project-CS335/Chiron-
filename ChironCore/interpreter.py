@@ -308,8 +308,9 @@ class ConcreteInterpreter(Interpreter):
                 return local_value
 
         # Fall back to global scope
-        print(f"Returning {name} as {getattr(self.prg, name,None)}")
-        return getattr(self.prg, name,None)
+        global_value = getattr(self.prg, name, None)
+        print(f"Variable {name} has global value {global_value}")
+        return global_value
 
     def set_variable(self, name, value):
         """Set variable value respecting scope chain"""
@@ -421,31 +422,40 @@ class ConcreteInterpreter(Interpreter):
 
     def evaluate_expression(self, expr):
         """Evaluate an expression with proper variable scoping"""
-        if isinstance(expr, ChironAST.ArithExpr):
-            if isinstance(expr, ChironAST.BinArithOp):
-                print("Getting left variable")
-                left_val = self.evaluate_expression(expr.lexpr)
-                print(f"Left value: {left_val}")
-                print("Getting right variable")
-                right_val = self.evaluate_expression(expr.rexpr)
-                print(f"Right Value: {right_val}")
-                if isinstance(expr, ChironAST.Sum):
-                    return left_val + right_val
-                elif isinstance(expr, ChironAST.Diff):
-                    return left_val - right_val
-                elif isinstance(expr, ChironAST.Mult):
-                    return left_val * right_val
-                elif isinstance(expr, ChironAST.Div):
-                    if right_val == 0:
-                        raise ValueError("Division by zero")
-                    return left_val / right_val
+        if isinstance(expr, ChironAST.BinArithOp):
+            print(f"Evaluating binary operation: {expr}")
+            print("Getting left variable")
+            left_val = self.evaluate_expression(expr.lexpr)
+            print(f"Left value: {left_val}")
+            print("Getting right variable")
+            right_val = self.evaluate_expression(expr.rexpr)
+            print(f"Right Value: {right_val}")
+            if left_val is None or right_val is None:
+                print(
+                    f"Error: Cannot evaluate arithmetic operation with None values: {left_val} {expr.symbol} {right_val}")
+                if left_val is None:
+                    print(f"Left expression {expr.lexpr} evaluated to None")
+                if right_val is None:
+                    print(f"Right expression {expr.rexpr} evaluated to None")
+                # Instead of returning None, raise a more informative error
+                raise ValueError(f"Cannot perform operation {expr.symbol} with operands {left_val} and {right_val}")
+            if isinstance(expr, ChironAST.Sum):
+                return left_val + right_val
+            elif isinstance(expr, ChironAST.Diff):
+                return left_val - right_val
+            elif isinstance(expr, ChironAST.Mult):
+                return left_val * right_val
+            elif isinstance(expr, ChironAST.Div):
+                if right_val == 0:
+                    raise ValueError("Division by zero")
+                return left_val / right_val
 
-                # Handle unary arithmetic operations
-            elif isinstance(expr, ChironAST.UnaryArithOp):
-                val = self.evaluate_expression(expr.expr)
+            # Handle unary arithmetic operations
+        elif isinstance(expr, ChironAST.UnaryArithOp):
+            val = self.evaluate_expression(expr.expr)
 
-                if isinstance(expr, ChironAST.UMinus):
-                    return -val
+            if isinstance(expr, ChironAST.UMinus):
+                return -val
 
             # Handle AST nodes for boolean operations
         elif isinstance(expr, ChironAST.BinCondOp):
@@ -641,6 +651,7 @@ class ConcreteInterpreter(Interpreter):
 
         # Get the expression to return, if present
         ret_value = None
+        print(stmt.expr)
         if hasattr(stmt, 'expr') and stmt.expr is not None:
             print(stmt.expr)
             ret_value = self.evaluate_expression(stmt.expr)
@@ -648,13 +659,16 @@ class ConcreteInterpreter(Interpreter):
         # Get the current activation record
         current_activation = self.call_stack.pop()
         return_addr = current_activation.return_address
-        print(f"returning to the address {return_addr}")
+        print(f"Returning from {current_activation.proc_name} with value {ret_value} to address {return_addr}")
         # If there's a caller, store the return value in the caller's activation record
         if self.call_stack:
             caller_activation = self.call_stack[-1]
             caller_activation.set_return_value(ret_value)
             print(f"Stored return value in caller's {caller_activation.proc_name}activation record")
-
+        else:
+            # If no caller (returning to main), we don't need to create a new activation record
+            # Just log that we're returning from the main program
+            print(f"Main program returned with value: {ret_value}")
         # Calculate jump target to return to caller
         return return_addr - self.pc
 
